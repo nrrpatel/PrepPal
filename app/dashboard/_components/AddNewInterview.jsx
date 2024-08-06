@@ -15,9 +15,10 @@ import { chatSession } from '@/utils/GeminiAIModal'
 import { LoaderCircle } from 'lucide-react'
 import { db } from '@/utils/db'
 import { PrepPal } from '@/utils/schema'
-import { v4 } from 'uuid'
+import { v4 as uuidv4 } from 'uuid'
 import { useUser } from '@clerk/nextjs'
 import moment from 'moment'
+import { useRouter } from 'next/navigation'
 
 function AddNewInterview() {
     const [openDialog, setOpenDialog] = useState(false)
@@ -26,6 +27,7 @@ function AddNewInterview() {
     const [jobExperience, setJobExperience] = useState();
     const [loading, setLoading] = useState(false);
     const [JsonResponse, setJsonResponse]= useState([])
+    const router=useRouter();
     const {user} = useUser()
 
     const onSubmit=async(e) => {
@@ -34,23 +36,27 @@ function AddNewInterview() {
         console.log(jobPosition, jobDesc, jobExperience);
         const InputPrompt = "Generate a set of " + process.env.NEXT_PUBLIC_INTERVIEW_QUESTION_COUNT + " interview questions and answers for a candidate applying for the position of " + jobPosition + " with " + jobExperience + " years of experience. The candidate will be expected to work with " + jobDesc + " technologies and tools. Include a mix of technical and soft skills questions. Provide detailed answers that are relevant to the role. The generated output should be in JSON format with 'Question' and 'Answer' as fields.";
         const result= await chatSession.sendMessage(InputPrompt)
-        const MockJsonResp=(result.response.text()).replace('```json', '').replace('```', '')
+        const MockJsonResp=(result.response.text()).replace('```json', "").replace('```', "")
         console.log(JSON.parse(MockJsonResp));
         setJsonResponse(MockJsonResp)
 
         if (MockJsonResp){
         const resp = await db.insert(PrepPal)
         .values({
-            mockId:uuidv4(),
+            prepId:uuidv4(),
             jsonPrepResp: MockJsonResp,
             jobPosition: jobPosition,
             jobDesc: jobDesc,
             jobExperience: jobExperience,
             createdBy: user?.primaryEmailAddress?.emailAddress,
             createdAt: moment().format('DD-MM-yyyy')
-        }).returning({mockId:PrepPal.mockId});
+        }).returning({prepId:PrepPal.prepId});
     
         console.log("Inserted ID:", resp);
+        if(resp){
+            setOpenDialog(false)
+            router.push('/dashboard/interview/'+resp[0]?.prepId)
+        }
         }
         else{
             console.log("Error");
